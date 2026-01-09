@@ -44,34 +44,84 @@ export class RestTemplate {
         this.interceptors = interceptors;
     }
 
-    public async getForObject<T>(url: string, responseType: any): Promise<T | null> {
-        const response = await this.exchange<T>(url, HttpMethod.GET, null, responseType);
+    private expandUrl(url: string, uriVariables?: any): string {
+        if (!uriVariables) {
+            return url;
+        }
+        if (Array.isArray(uriVariables)) {
+            let expandedUrl = url;
+            uriVariables.forEach(value => {
+                expandedUrl = expandedUrl.replace(/\{.*?\}/, String(value));
+            });
+            return expandedUrl;
+        }
+        return url.replace(/\{(\w+)\}/g, (_, key) => {
+            return uriVariables[key] !== undefined ? String(uriVariables[key]) : `{${key}}`;
+        });
+    }
+
+    public async getForObject<T>(url: string, responseType: any, uriVariables?: any): Promise<T | null> {
+        const response = await this.exchange<T>(url, HttpMethod.GET, null, responseType, uriVariables);
         return response.getBody();
     }
 
-    public async getForEntity<T>(url: string, responseType: any): Promise<ResponseEntity<T>> {
-        return this.exchange<T>(url, HttpMethod.GET, null, responseType);
+    public async getForEntity<T>(url: string, responseType: any, uriVariables?: any): Promise<ResponseEntity<T>> {
+        return this.exchange<T>(url, HttpMethod.GET, null, responseType, uriVariables);
     }
 
-    public async postForObject<T>(url: string, request: any, responseType: any): Promise<T | null> {
+    public async headForHeaders(url: string, uriVariables?: any): Promise<HttpHeaders> {
+        const response = await this.exchange(url, HttpMethod.HEAD, null, null, uriVariables);
+        return response.getHeaders();
+    }
+
+    public async postForLocation(url: string, request: any, uriVariables?: any): Promise<string | null> {
+        const response = await this.exchange(url, HttpMethod.POST, request instanceof HttpEntity ? request : new HttpEntity(request), null, uriVariables);
+        return response.getHeaders().getFirst('Location');
+    }
+
+    public async postForObject<T>(url: string, request: any, responseType: any, uriVariables?: any): Promise<T | null> {
         let requestEntity: HttpEntity<any>;
         if (request instanceof HttpEntity) {
             requestEntity = request;
         } else {
             requestEntity = new HttpEntity(request);
         }
-        const response = await this.exchange<T>(url, HttpMethod.POST, requestEntity, responseType);
+        const response = await this.exchange<T>(url, HttpMethod.POST, requestEntity, responseType, uriVariables);
         return response.getBody();
     }
 
-    public async postForEntity<T>(url: string, request: any, responseType: any): Promise<ResponseEntity<T>> {
+    public async postForEntity<T>(url: string, request: any, responseType: any, uriVariables?: any): Promise<ResponseEntity<T>> {
         let requestEntity: HttpEntity<any>;
         if (request instanceof HttpEntity) {
             requestEntity = request;
         } else {
             requestEntity = new HttpEntity(request);
         }
-        return this.exchange<T>(url, HttpMethod.POST, requestEntity, responseType);
+        return this.exchange<T>(url, HttpMethod.POST, requestEntity, responseType, uriVariables);
+    }
+
+    public async put(url: string, request: any, uriVariables?: any): Promise<void> {
+        let requestEntity: HttpEntity<any>;
+        if (request instanceof HttpEntity) {
+            requestEntity = request;
+        } else {
+            requestEntity = new HttpEntity(request);
+        }
+        await this.exchange(url, HttpMethod.PUT, requestEntity, null, uriVariables);
+    }
+
+    public async delete(url: string, uriVariables?: any): Promise<void> {
+        await this.exchange(url, HttpMethod.DELETE, null, null, uriVariables);
+    }
+
+    public async optionsForAllow(url: string, uriVariables?: any): Promise<Set<HttpMethod>> {
+        const response = await this.exchange(url, HttpMethod.OPTIONS, null, null, uriVariables);
+        const allowHeader = response.getHeaders().getFirst('Allow');
+        const methods = new Set<HttpMethod>();
+        if (allowHeader) {
+            allowHeader.split(',').forEach(m => methods.add(m.trim() as HttpMethod));
+        }
+        return methods;
     }
 
     public async setupRequestFactory(config: AxiosRequestConfig): Promise<void> {
@@ -81,6 +131,7 @@ export class RestTemplate {
 
     public async exchange<T>(url: string, method: HttpMethod, requestEntity: HttpEntity<any> | null, responseType: any, uriVariables?: any): Promise<ResponseEntity<T>> {
 
+        const expandedUrl = this.expandUrl(url, uriVariables);
         const headers = requestEntity ? requestEntity.getHeaders() : new HttpHeaders();
         const body = requestEntity ? requestEntity.getBody() : null;
 
@@ -88,10 +139,10 @@ export class RestTemplate {
         if (this.interceptors.length > 0) {
             const chain = new Chain(this.interceptors, this);
             chain.setResponseType(responseType);
-            return chain.execute(url, method, headers, body);
+            return chain.execute(expandedUrl, method, headers, body);
         }
 
-        return this.doExecute(url, method, headers, body, responseType);
+        return this.doExecute(expandedUrl, method, headers, body, responseType);
     }
 
     public async doExecute<T>(url: string, method: HttpMethod, headers: HttpHeaders, body: any, responseType: any): Promise<ResponseEntity<T>> {
@@ -128,7 +179,7 @@ export class RestTemplate {
 
             let responseBody = axiosResponse.data;
             // Deserialize response
-            if (responseBody && this.converters) {
+            if (responseBody && this.converters && responseType) {
                 const contentTypeResp = axiosResponse.headers['content-type'];
                 let mediaType: MediaType | undefined;
                 if (contentTypeResp) {
