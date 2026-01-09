@@ -1,5 +1,6 @@
 import { HttpMessageConverter } from '../HttpMessageConverter';
 import { ObjectMapper } from 'jackson-js';
+import moment from 'moment';
 
 export class MappingJackson2HttpMessageConverter implements HttpMessageConverter<any> {
     private objectMapper: ObjectMapper;
@@ -9,11 +10,13 @@ export class MappingJackson2HttpMessageConverter implements HttpMessageConverter
     }
 
     public canRead(clazz: any, mediaType?: string): boolean {
-        return true; // Simplified for now
+         if (!mediaType) return false;
+        return this.getSupportedMediaTypes().includes(mediaType);
     }
 
     public canWrite(clazz: any, mediaType?: string): boolean {
-        return true; // Simplified for now
+         if (!mediaType) return false;
+        return this.getSupportedMediaTypes().includes(mediaType);
     }
 
     public getSupportedMediaTypes(): string[] {
@@ -21,14 +24,21 @@ export class MappingJackson2HttpMessageConverter implements HttpMessageConverter
     }
 
     public read(clazz: any, inputMessage: any): any {
-        // inputMessage is expected to be the response body string/object
+        const context = {
+            mainCreator: () => [clazz] as [any],
+            dateLibrary: moment
+        };
+
         if (typeof inputMessage === 'string') {
-            return this.objectMapper.parse(inputMessage, { mainCreator: () => [clazz] });
+            return this.objectMapper.parse(inputMessage, context);
         }
-        return this.objectMapper.parse(JSON.stringify(inputMessage), { mainCreator: () => [clazz] });
+        return this.objectMapper.parse(JSON.stringify(inputMessage), context);
     }
 
     public write(t: any, contentType?: string): any {
-        return this.objectMapper.stringify(t);
+        const context = {
+            dateLibrary: moment
+        };
+        return this.objectMapper.stringify(t, context);
     }
 }

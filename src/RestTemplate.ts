@@ -8,6 +8,7 @@ import { MappingJackson2HttpMessageConverter } from './converter/json/MappingJac
 import { ResponseErrorHandler } from './error/ResponseErrorHandler';
 import { DefaultResponseErrorHandler } from './error/DefaultResponseErrorHandler';
 import { ClientHttpRequestInterceptor, ClientHttpRequestExecution } from './http/client/ClientHttpRequestInterceptor';
+import { FormHttpMessageConverter } from './converter/FormHttpMessageConverter';
 
 export class RestTemplate {
     private converters: HttpMessageConverter<any>[];
@@ -19,7 +20,7 @@ export class RestTemplate {
         converters?: HttpMessageConverter<any>[],
         interceptors?: ClientHttpRequestInterceptor[]
     ) {
-        this.converters = converters || [new MappingJackson2HttpMessageConverter()];
+        this.converters = converters || [new FormHttpMessageConverter(), new MappingJackson2HttpMessageConverter()];
         this.errorHandler = new DefaultResponseErrorHandler();
         this.interceptors = interceptors || [];
         this.axiosInstance = axios.create();
@@ -47,12 +48,24 @@ export class RestTemplate {
     }
 
     public async postForObject<T>(url: string, request: any, responseType: any): Promise<T | null> {
-        const response = await this.exchange<T>(url, HttpMethod.POST, new HttpEntity(request), responseType);
+        let requestEntity: HttpEntity<any>;
+        if (request instanceof HttpEntity) {
+            requestEntity = request;
+        } else {
+            requestEntity = new HttpEntity(request);
+        }
+        const response = await this.exchange<T>(url, HttpMethod.POST, requestEntity, responseType);
         return response.getBody();
     }
 
     public async postForEntity<T>(url: string, request: any, responseType: any): Promise<ResponseEntity<T>> {
-        return this.exchange<T>(url, HttpMethod.POST, new HttpEntity(request), responseType);
+        let requestEntity: HttpEntity<any>;
+        if (request instanceof HttpEntity) {
+            requestEntity = request;
+        } else {
+            requestEntity = new HttpEntity(request);
+        }
+        return this.exchange<T>(url, HttpMethod.POST, requestEntity, responseType);
     }
 
     public async setupRequestFactory(config: AxiosRequestConfig): Promise<void> {

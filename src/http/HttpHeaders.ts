@@ -43,6 +43,14 @@ export class HttpHeaders {
         return this.getFirst('Content-Type');
     }
 
+    public getPragma(): string | null {
+        return this.getFirst('Pragma');
+    }
+
+    public setPragma(pragma: string): void {
+        this.set('Pragma', pragma);
+    }
+
     public toObject(): Record<string, string | string[]> {
         const obj: Record<string, string | string[]> = {};
         for (const [key, values] of this.headers.entries()) {
