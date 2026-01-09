@@ -1,24 +1,31 @@
 import { HttpMessageConverter } from './HttpMessageConverter';
+import { MediaType } from '../http/MediaType';
+import { HttpHeaders } from '../http/HttpHeaders';
 
 export class FormHttpMessageConverter implements HttpMessageConverter<any> {
-    public canRead(clazz: any, mediaType?: string): boolean {
+    public canRead(clazz: any, mediaType?: MediaType): boolean {
         return false; // Typically these endpoints don't return form data
     }
 
-    public canWrite(clazz: any, mediaType?: string): boolean {
-        if (!mediaType) return false;
-        return this.getSupportedMediaTypes().includes(mediaType);
+    public canWrite(clazz: any, mediaType?: MediaType): boolean {
+        if (!mediaType) return true;
+        for (const supported of this.getSupportedMediaTypes()) {
+            if (supported.isCompatibleWith(mediaType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    public getSupportedMediaTypes(): string[] {
-        return ['application/x-www-form-urlencoded'];
+    public getSupportedMediaTypes(): MediaType[] {
+        return [MediaType.APPLICATION_FORM_URLENCODED];
     }
 
     public read(clazz: any, inputMessage: any): any {
         throw new Error('FormHttpMessageConverter does not support reading');
     }
 
-    public write(t: any, contentType?: string): any {
+    public write(t: any, contentType?: MediaType, outputHeaders?: HttpHeaders): any {
         // t should be a string (key=value&...) or a URLSearchParams object or an arbitrary object
         if (typeof t === 'string') {
             return t;

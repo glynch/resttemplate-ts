@@ -1,3 +1,5 @@
+import { MediaType } from './MediaType';
+
 export class HttpHeaders {
     // Using a map to store headers. implementing a subset of Spring's HttpHeaders
     private headers: Map<string, string[]>;
@@ -35,12 +37,13 @@ export class HttpHeaders {
         return values && values.length > 0 ? values[0] : null;
     }
 
-    public setContentType(mediaType: string): void {
-        this.set('Content-Type', mediaType);
+    public setContentType(mediaType: MediaType | string): void {
+        this.set('Content-Type', mediaType.toString());
     }
 
-    public getContentType(): string | null {
-        return this.getFirst('Content-Type');
+    public getContentType(): MediaType | null {
+        const value = this.getFirst('Content-Type');
+        return value ? MediaType.parseMediaType(value) : null;
     }
 
     public getPragma(): string | null {
@@ -49,6 +52,16 @@ export class HttpHeaders {
 
     public setPragma(pragma: string): void {
         this.set('Pragma', pragma);
+    }
+
+    public setAcceptCharset(charsets: string | string[]): void {
+        if (typeof charsets === 'string') {
+            this.set('Accept-Charset', charsets);
+        } else {
+            // In Java it's a list of Charsets. Here we take strings.
+            // If array, join with comma
+            this.set('Accept-Charset', charsets.join(', '));
+        }
     }
 
     public toObject(): Record<string, string | string[]> {

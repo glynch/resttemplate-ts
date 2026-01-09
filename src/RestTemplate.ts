@@ -9,6 +9,8 @@ import { ResponseErrorHandler } from './error/ResponseErrorHandler';
 import { DefaultResponseErrorHandler } from './error/DefaultResponseErrorHandler';
 import { ClientHttpRequestInterceptor, ClientHttpRequestExecution } from './http/client/ClientHttpRequestInterceptor';
 import { FormHttpMessageConverter } from './converter/FormHttpMessageConverter';
+import { MediaType } from './http/MediaType';
+import { StringHttpMessageConverter } from './converter/StringHttpMessageConverter';
 
 export class RestTemplate {
     private converters: HttpMessageConverter<any>[];
@@ -20,7 +22,11 @@ export class RestTemplate {
         converters?: HttpMessageConverter<any>[],
         interceptors?: ClientHttpRequestInterceptor[]
     ) {
-        this.converters = converters || [new FormHttpMessageConverter(), new MappingJackson2HttpMessageConverter()];
+        this.converters = converters || [
+            new StringHttpMessageConverter(),
+            new FormHttpMessageConverter(),
+            new MappingJackson2HttpMessageConverter()
+        ];
         this.errorHandler = new DefaultResponseErrorHandler();
         this.interceptors = interceptors || [];
         this.axiosInstance = axios.create();
@@ -97,7 +103,7 @@ export class RestTemplate {
         if (body && this.converters) {
             for (const converter of this.converters) {
                 if (converter.canWrite(body.constructor, contentType || undefined)) {
-                    requestBody = converter.write(body, contentType || undefined);
+                    requestBody = converter.write(body, contentType || undefined, headers);
                     if (!contentType) {
                         const supported = converter.getSupportedMediaTypes();
                         if (supported && supported.length > 0) {
@@ -124,8 +130,17 @@ export class RestTemplate {
             // Deserialize response
             if (responseBody && this.converters) {
                 const contentTypeResp = axiosResponse.headers['content-type'];
+                let mediaType: MediaType | undefined;
+                if (contentTypeResp) {
+                    try {
+                        mediaType = MediaType.parseMediaType(contentTypeResp);
+                    } catch (ex) {
+                        // ignore invalid media type
+                    }
+                }
+
                 for (const converter of this.converters) {
-                    if (converter.canRead(responseType, contentTypeResp)) {
+                    if (converter.canRead(responseType, mediaType)) {
                         responseBody = converter.read(responseType, responseBody);
                         break;
                     }
