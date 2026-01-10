@@ -2,8 +2,11 @@
     "name": "resttemplate-ts",
     "version": "1.0.0",
     "description": "A TypeScript clone of Java Spring RestTemplate",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "main": "dist/src/index.js",
+    "types": "dist/src/index.d.ts",
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "tsc",
         "test": "jest"
